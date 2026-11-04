@@ -1,0 +1,40 @@
+name: JMeter smoke test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download JMeter
+        run: |
+          curl -fsSL -o jmeter.tgz https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz
+          tar -xzf jmeter.tgz
+
+      - name: Run test plan
+        run: |
+          apache-jmeter-5.6.3/bin/jmeter -n -t jsonplaceholder-smoke.jmx -l results.jtl -e -o report
+
+      - name: Fail on any failed request
+        run: |
+          failed=$(awk -F, 'NR>1 && $8=="false"' results.jtl | wc -l)
+          echo "Failed requests: $failed"
+          test "$failed" -eq 0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-results
+          path: |
+            results.jtl
+            report
